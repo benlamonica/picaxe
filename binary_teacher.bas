@@ -8,13 +8,13 @@
 ' === Constants ===
 
 symbol DECODE_DIGITS = %00000111 ' bitmask of the digits that you want to use the internal font
-symbol NUM_DIGITS = 3            ' number of digits that you want to multiplex
+symbol NUM_DIGITS = 4            ' number of digits that you want to multiplex
 symbol BRIGHTNESS = 100          ' 100 = full brightness, 50 = half brightness, 25 = quarter brightness
 
 ' Hardware interface to the MAX7219 
-symbol MAX_CLOCK_PIN = 4   ' data is valid on the rising edge of the clock pin
-symbol MAX_DATA_PIN = 1    ' data bits are shifted out this pin to the MAX7219
-symbol MAX_LOAD_PIN = 2    ' briefly pulse this output to transfer data to LEDs
+symbol MAX_CLOCK_PIN = C.0 ' data is valid on the rising edge of the clock pin
+symbol MAX_DATA_PIN = C.1  ' data bits are shifted out this pin to the MAX7219
+symbol MAX_LOAD_PIN = C.7    ' briefly pulse this output to transfer data to LEDs
 
 ' Register addresses for the MAX7219
 symbol REG_DECODE = 9      ' decode register; specify digits to decode
@@ -28,6 +28,13 @@ symbol max_data = b0       ' data to be transmitted to the MAX7219
 symbol max_register = b1   ' MAX7219 register that receives data
 symbol index = b2          ' used in subroutine for...next loop
 
+symbol switch_state = b3   ' used to hold the value of all of the switches
+symbol last_state = b4     ' used to know if we need to refresh the display
+
+' === configure pins ===
+let dirsb = %00000000      ' set entire b port to input
+output C.0, C.1, C.7
+
 ' === Main Program ===
 
 ' the MAX7219 clock can only be pulsed at max of 10Mhz, so stay below that
@@ -36,18 +43,32 @@ setfreq m8
 ' Initialize the MAX7219
 gosub init_max7219
 
-' put some test numbers up
-max_register = 1
-max_data = 3
-gosub send_data
+main_loop:
+  switch_state = pinsb  ' find which switches are on
 
-max_register = 2
-max_data = 2
-gosub send_data
+  if switch_state != last_state then    ' if the switches have changed from last time...
+    max_register = 3
+    max_data = switch_state / 100       ' set the hundreds digit
+    gosub send_data
 
-max_register = 3
-max_data = 1
-gosub send_data
+    max_register = 2
+    max_data = switch_state % 100 / 10  ' set the tens digit
+    gosub send_data
+
+    max_register = 1
+    max_data = switch_state % 100 % 10  ' set the ones digit
+    gosub send_data
+
+    max_register = 4 
+    max_data = switch_state             ' set the LED lights that are on
+    gosub send_data
+
+    last_state = switch_state
+  end if
+
+  pause 200                             ' wait 200ms before checking again
+    
+goto main_loop
 
 ' === End Main Program - Subroutines Follow ===============================
 turn_on_display:
