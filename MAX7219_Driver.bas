@@ -8,19 +8,20 @@
 ' === Constants ===
 
 symbol DECODE_DIGITS = %00000111 ' bitmask of the digits that you want to use the internal font
-symbol NUM_DIGITS = 3            ' number of digits that you want to multiplex
+symbol NUM_DIGITS = 4            ' number of digits that you want to multiplex
 symbol BRIGHTNESS = 100          ' 100 = full brightness, 50 = half brightness, 25 = quarter brightness
 
 ' Hardware interface to the MAX7219 
-symbol MAX_CLOCK_PIN = 4   ' data is valid on the rising edge of the clock pin
-symbol MAX_DATA_PIN = 1    ' data bits are shifted out this pin to the MAX7219
-symbol MAX_LOAD_PIN = 2    ' briefly pulse this output to transfer data to LEDs
+symbol MAX_CLOCK_PIN = C.2   ' data is valid on the rising edge of the clock pin
+symbol MAX_DATA_PIN = C.4    ' data bits are shifted out this pin to the MAX7219
+symbol MAX_LOAD_PIN = C.1   ' briefly pulse this output to transfer data to LEDs
 
 ' Register addresses for the MAX7219
 symbol REG_DECODE = 9      ' decode register; specify digits to decode
 symbol REG_BRIGHTNESS = 10 ' intensity (brightness) register; 15 = 100%
 symbol REG_SCAN = 11       ' scan-limit register; specify how many digits
 symbol REG_DISPLAY = 12    ' 1 = display on; 0 = display off 
+symbol REG_TEST_MODE = 0xF ' turn on all segments
 
 ' === Variables ===
 symbol outword = w0        ' concatenation of maxreg and outbyte
@@ -48,6 +49,12 @@ gosub send_data
 max_register = 3
 max_data = 1
 gosub send_data
+
+max_register = 4
+max_data = %01111011
+gosub send_data
+
+goto endofprogram
 
 ' === End Main Program - Subroutines Follow ===============================
 turn_on_display:
@@ -77,6 +84,11 @@ set_brightness:
   gosub send_data
   return
 
+set_test_mode:
+  max_register = REG_TEST_MODE
+  gosub send_data
+  return
+  
 init_max7219:
   max_data = DECODE_DIGITS    ' turn on decode mode for the first 3 digits
   gosub set_decode_mode
@@ -106,3 +118,5 @@ send_data:
 
   pulsout MAX_LOAD_PIN,1     ' load the data word into MAX7219
   return
+  
+ endofprogram:

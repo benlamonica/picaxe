@@ -1,9 +1,9 @@
-' === MAX7219_Driver.bas ============= 
-' (c) 2012 - Ron Hackett, Evan Venn
+' === binary_teachder.bas ============= 
 ' (c) 2106 - Ben La Monica
 
-' This program runs on a PICAXE-08M & controls a MAX7219 LED display driver.
-' The MAX7219 can be connected to eight 7-segment LED displays.
+' This program runs on a PICAXE-18M2 & controls a MAX7219 LED display driver.
+' It is used to teach binary using rocker switches and displaying the answer,
+' as well as lighting up LEDs showing the state of the switch.
 
 ' === Constants ===
 
@@ -12,9 +12,10 @@ symbol NUM_DIGITS = 4            ' number of digits that you want to multiplex
 symbol BRIGHTNESS = 100          ' 100 = full brightness, 50 = half brightness, 25 = quarter brightness
 
 ' Hardware interface to the MAX7219 
-symbol MAX_CLOCK_PIN = C.0 ' data is valid on the rising edge of the clock pin
-symbol MAX_DATA_PIN = C.1  ' data bits are shifted out this pin to the MAX7219
+symbol MAX_CLOCK_PIN = C.3   ' data is valid on the rising edge of the clock pin
+symbol MAX_DATA_PIN = C.1    ' data bits are shifted out this pin to the MAX7219
 symbol MAX_LOAD_PIN = C.7    ' briefly pulse this output to transfer data to LEDs
+symbol SHOW_ANSWER = C.6     ' turns the led display on or off, useful for hiding the answer
 
 ' Register addresses for the MAX7219
 symbol REG_DECODE = 9      ' decode register; specify digits to decode
@@ -27,13 +28,17 @@ symbol outword = w0        ' concatenation of maxreg and outbyte
 symbol max_data = b0       ' data to be transmitted to the MAX7219
 symbol max_register = b1   ' MAX7219 register that receives data
 symbol index = b2          ' used in subroutine for...next loop
-
-symbol switch_state = b3   ' used to hold the value of all of the switches
-symbol last_state = b4     ' used to know if we need to refresh the display
+'b3 unused
+symbol state = w2          ' combined current display and switch state
+symbol switch_state = b4   ' used to hold the value of all of the switches
+symbol display_state = b5  ' holds current display (on/off) state
+symbol last_state = w3         ' combined switch and display state for easy checking
+symbol last_switch_state = b6  ' used to know if we need to refresh the display
+symbol last_display_state = b7 ' used to know when the user flips the display on or off
 
 ' === configure pins ===
 let dirsb = %00000000      ' set entire b port to input
-output C.0, C.1, C.7
+output C.3, C.1, C.7
 
 ' === Main Program ===
 
@@ -43,34 +48,58 @@ setfreq m8
 ' Initialize the MAX7219
 gosub init_max7219
 
+last_state = 0
+last_display_state = 0
+
 main_loop:
   switch_state = pinsb  ' find which switches are on
-
-  if switch_state != last_state then    ' if the switches have changed from last time...
-    max_register = 3
-    max_data = switch_state / 100       ' set the hundreds digit
-    gosub send_data
-
-    max_register = 2
-    max_data = switch_state % 100 / 10  ' set the tens digit
-    gosub send_data
-
-    max_register = 1
-    max_data = switch_state % 100 % 10  ' set the ones digit
-    gosub send_data
-
+  display_state = SHOW_ANSWER
+  
+  if state != last_state then     ' if the switches have changed from last time...
+    'if display_state = 1 then
+      gosub display_answer
+    'else
+    '  gosub blank_answer
+    'end if
+    
     max_register = 4 
-    max_data = switch_state             ' set the LED lights that are on
+    max_data = switch_state       ' set the LED lights that are on
     gosub send_data
 
-    last_state = switch_state
+    last_state = state
   end if
 
-  pause 200                             ' wait 200ms before checking again
+  pause 200                       ' wait 200ms before checking again
     
 goto main_loop
 
 ' === End Main Program - Subroutines Follow ===============================
+display_answer:
+  max_data = switch_state / 100       ' set the hundreds digit
+  max_register = 3
+  gosub send_data
+
+  max_data = switch_state % 100 / 10  ' set the tens digit
+  max_register = 2
+  gosub send_data
+
+  max_register = 1
+  max_data = switch_state % 100 % 10  ' set the ones digit
+  gosub send_data
+  return
+  
+blank_answer:
+  max_data = 0xF    ' blank out the display
+  max_register = 3
+  gosub send_data
+  
+  max_register = 2
+  gosub send_data
+
+  max_register = 1
+  gosub send_data
+  return
+
 turn_on_display:
   max_data = 1
   max_register = REG_DISPLAY
